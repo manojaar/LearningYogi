@@ -1,0 +1,32 @@
+{
+  "system_help": {
+    "upload": "You can upload timetable images (PNG, JPG) or PDF files. Drag and drop them onto the upload area or click to browse.",
+    "processing": "After upload, the system processes your timetable using OCR and AI. High confidence extractions (>80%) are validated directly, while lower confidence ones use AI enhancement.",
+    "results": "You can view your extracted timetable in weekly or daily format. Each subject is color-coded for easy identification.",
+    "export": "You can export your timetable data as CSV or JSON for use in other applications.",
+    "accuracy": "The system achieves >90% accuracy. High-quality images typically get >80% confidence from OCR alone."
+  },
+  "faq": [
+    {
+      "question": "What file formats are supported?",
+      "answer": "We support PNG, JPG, JPEG, and PDF files for timetable uploads."
+    },
+    {
+      "question": "How accurate is the extraction?",
+      "answer": "The system achieves >90% accuracy. High-quality images typically get >80% confidence from OCR alone, while lower quality images are enhanced with AI."
+    },
+    {
+      "question": "Can I edit the extracted timetable?",
+      "answer": "Yes, you can review and validate the extracted data before saving. The system provides a validation interface for corrections."
+    },
+    {
+      "question": "What happens to my uploaded files?",
+      "answer": "Your files are processed and stored securely. The extracted data is saved in the database for future reference."
+    },
+    {
+      "question": "How long does processing take?",
+      "answer": "Processing typically takes 6-8 seconds for high-confidence extractions and 15-20 seconds when AI enhancement is needed."
+    }
+  ]
+}
+

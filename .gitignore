@@ -1,0 +1,117 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+virtualenv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+htmlcov/
+.nyc_output/
+.coverage
+.pytest_cache/
+
+# Docker
+.docker/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Data directories (exclude large uploads, keep structure)
+data/uploads/*
+!data/uploads/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/database/*
+!data/database/.gitkeep
+
+# Keep sample timetables
+!data/sample_timetables/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Compiled files
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Local settings
+settings.local.json
+*.local.json
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Kubernetes secrets
+*.secret.yaml
+*.secret.yml

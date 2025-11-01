@@ -1,0 +1,69 @@
+# Training Configuration
+
+# OCR Model Training
+ocr:
+  teacher:
+    model_name: "microsoft/trocr-large-printed"
+    epochs: 10
+    batch_size: 8
+    learning_rate: 5e-5
+    output_dir: "models/ocr_teacher"
+  
+  student:
+    teacher_model: "models/ocr_teacher"
+    student_model: "microsoft/trocr-small-printed"
+    epochs: 10
+    batch_size: 16
+    learning_rate: 5e-5
+    temperature: 5.0
+    alpha: 0.5
+    output_dir: "models/ocr_student"
+  
+  lora:
+    model_name: "microsoft/trocr-base-printed"
+    epochs: 5
+    batch_size: 8
+    learning_rate: 3e-4
+    rank: 16
+    alpha: 32
+    target_modules: ["query", "key", "value"]
+    output_dir: "models/ocr_lora"
+
+# Document Model Training
+document:
+  base:
+    model_name: "meta-llama/Llama-3-8B"
+    epochs: 5
+    batch_size: 4
+    learning_rate: 2e-4
+    output_dir: "models/document_base"
+  
+  lora:
+    model_name: "models/document_base"
+    epochs: 3
+    batch_size: 4
+    learning_rate: 2e-4
+    rank: 32
+    alpha: 64
+    target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+    output_dir: "models/document_lora"
+
+# General Training Settings
+training:
+  val_split: 0.2
+  num_workers: 4
+  pin_memory: true
+  seed: 42
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  warmup_steps: 0.1  # Fraction of total steps
+
+# Dataset Configuration
+dataset:
+  max_length: 512
+  image_size: 224
+  augmentations:
+    - horizontal_flip
+    - rotation
+    - brightness_adjustment
+

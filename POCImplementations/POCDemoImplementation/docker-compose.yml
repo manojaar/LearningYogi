@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:4000
+    # volumes:
+    #   - ./frontend:/app
+    #   - /app/node_modules
+    depends_on:
+      - nodejs-api
+    restart: unless-stopped
+
+  nodejs-api:
+    build: ./backend/nodejs
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=./data/database/app.db
+      - PYTHON_API_URL=http://python-ai:8000
+      - STORAGE_PATH=/data/uploads
+      - PORT=4000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - QUEUE_CONCURRENCY=2
+      - MAX_IMAGE_DIMENSION=2048
+      - IMAGE_QUALITY=85
+      - OUTPUT_FORMAT=webp
+    volumes:
+      # - ./backend/nodejs:/app
+      - ./data:/data
+      # - /app/node_modules
+    depends_on:
+      - python-ai
+      - redis
+    restart: unless-stopped
+
+  python-ai:
+    build: ./backend/python
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - STORAGE_PATH=/data/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      # - ./backend/python:/app
+      - ./data:/data
+      - ./logs:/logs
+    restart: unless-stopped
+
+  ai-chatbot:
+    build: ../AIChatbot/backend/python
+    ports:
+      - "9000:9000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CHATBOT_PROVIDER_PREFERENCE=${CHATBOT_PROVIDER_PREFERENCE:-claude,openai,local}
+      - CHATBOT_CLAUDE_MODEL=${CHATBOT_CLAUDE_MODEL:-claude-3-haiku-20240307}
+      - CHATBOT_OPENAI_MODEL=${CHATBOT_OPENAI_MODEL:-gpt-3.5-turbo}
+      - LOCAL_LLM_URL=${LOCAL_LLM_URL:-http://localhost:11434}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-llama2}
+      - CHATBOT_ENABLE_CONTEXT=${CHATBOT_ENABLE_CONTEXT:-true}
+      - POC_DB_URL=./data/database/app.db
+      - KNOWLEDGE_BASE_PATH=/config/knowledge_base
+    volumes:
+      - ../AIChatbot/config:/config:ro
+      - ./data:/data:ro
+    depends_on:
+      - nodejs-api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - default
+
+volumes:
+  postgres_data:
+  redis_data:
+

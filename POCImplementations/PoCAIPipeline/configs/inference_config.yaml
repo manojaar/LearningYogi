@@ -1,0 +1,48 @@
+# Inference Configuration
+
+# OCR Service
+ocr:
+  model_path: "models/ocr_lora"
+  model_version: "v1.0"
+  use_feature_store: true
+  fallback_to_tesseract: true
+  device: "auto"  # auto, cuda, cpu
+  batch_size: 1
+  max_length: 128
+
+# Document Service
+document:
+  model_path: "models/document_lora"
+  model_version: "v1.0"
+  use_feature_store: true
+  device: "auto"
+  max_new_tokens: 512
+  temperature: 0.1
+  do_sample: false
+
+# Feature Store
+feature_store:
+  enabled: true
+  repo_path: "feature_repo"
+  online_store:
+    type: "redis"
+    host: "localhost"
+    port: 6379
+  offline_store:
+    type: "file"
+    path: "data/features"
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  timeout: 300
+  max_request_size: 10485760  # 10MB
+
+# Model Caching
+caching:
+  enabled: true
+  cache_size: 100  # Number of models to cache
+  ttl: 3600  # Time to live in seconds
+

@@ -1,0 +1,42 @@
+# Learning Yogi - Python Lambda Functions (Serverless PoC2)
+# OCR Processing, LLM Integration, and Classification
+
+# AWS SDK
+boto3==1.34.14
+botocore==1.34.14
+
+# Image processing
+opencv-python-headless==4.9.0.80  # Headless for Lambda
+Pillow==10.1.0
+numpy==1.26.2
+
+# OCR engines
+pytesseract==0.3.10
+google-cloud-vision==3.5.0
+
+# LLM integration
+anthropic==0.7.8
+
+# Document processing
+PyMuPDF==1.23.8
+
+# Data validation
+pydantic==2.5.3
+
+# Logging
+aws-lambda-powertools==2.29.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+moto==4.2.9  # AWS mocking
+
+# Type checking
+mypy==1.7.1
+types-boto3==1.0.2
+
+# Linting
+black==23.12.1
+flake8==7.0.0

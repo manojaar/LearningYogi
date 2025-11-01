@@ -1,0 +1,54 @@
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "learningyogi-dev"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "us-east-1"
+image_repositories = []
+parameter_overrides = [
+    "Environment=dev",
+    "LogLevel=INFO",
+    "AllowedOrigins=http://localhost:5173,http://localhost:3000",
+    "DatabasePassword={{resolve:ssm:/learningyogi/dev/database-password}}",
+    "JWTSecret={{resolve:ssm:/learningyogi/dev/jwt-secret}}",
+    "AnthropicAPIKey={{resolve:ssm:/learningyogi/dev/anthropic-api-key}}",
+    "ProvisionedConcurrency=0"
+]
+
+[staging]
+[staging.deploy.parameters]
+stack_name = "learningyogi-staging"
+confirm_changeset = true
+parameter_overrides = [
+    "Environment=staging",
+    "LogLevel=INFO",
+    "AllowedOrigins=https://staging.learningyogi.com",
+    "DatabasePassword={{resolve:ssm:/learningyogi/staging/database-password}}",
+    "JWTSecret={{resolve:ssm:/learningyogi/staging/jwt-secret}}",
+    "AnthropicAPIKey={{resolve:ssm:/learningyogi/staging/anthropic-api-key}}",
+    "ProvisionedConcurrency=2"
+]
+
+[production]
+[production.deploy.parameters]
+stack_name = "learningyogi-prod"
+confirm_changeset = true
+fail_on_empty_changeset = false
+parameter_overrides = [
+    "Environment=production",
+    "LogLevel=WARNING",
+    "AllowedOrigins=https://app.learningyogi.com",
+    "DatabasePassword={{resolve:ssm:/learningyogi/prod/database-password}}",
+    "JWTSecret={{resolve:ssm:/learningyogi/prod/jwt-secret}}",
+    "AnthropicAPIKey={{resolve:ssm:/learningyogi/prod/anthropic-api-key}}",
+    "ProvisionedConcurrency=5"
+]

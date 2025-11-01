@@ -1,0 +1,54 @@
+# Feature Store Configuration
+
+project: timetable_extraction
+
+registry: feature_repo/data/registry.db
+
+provider: local
+
+online_store:
+  type: redis
+  connection_string: "localhost:6379"
+  redis_type: redis
+
+offline_store:
+  type: file
+  path: data/features
+
+# Feature Views Configuration
+feature_views:
+  ocr_features:
+    ttl: 365  # days
+    entities: ["document"]
+    features:
+      - text
+      - confidence
+      - word_count
+      - layout_score
+      - time_pattern_count
+  
+  document_features:
+    ttl: 365  # days
+    entities: ["document"]
+    features:
+      - image_embedding
+      - document_type
+      - preprocessing_applied
+      - extraction_confidence
+  
+  timetable_features:
+    ttl: 180  # days
+    entities: ["document"]
+    features:
+      - timetable_pattern_score
+      - subject_classification
+      - time_extraction_confidence
+      - day_pattern_detected
+
+# Materialization
+materialization:
+  enabled: true
+  schedule: "0 0 * * *"  # Daily at midnight
+  start_date: "2024-01-01"
+  end_date: "2024-12-31"
+

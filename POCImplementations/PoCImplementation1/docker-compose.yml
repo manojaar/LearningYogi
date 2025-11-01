@@ -1,0 +1,194 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: learningyogi-postgres
+    environment:
+      POSTGRES_USER: learningyogi
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: learningyogi_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learningyogi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (Cache & Message Queue)
+  redis:
+    image: redis:7-alpine
+    container_name: learningyogi-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Node.js API Service
+  api:
+    build:
+      context: ./backend/nodejs
+      dockerfile: Dockerfile
+    container_name: learningyogi-api
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: postgresql://learningyogi:devpassword@postgres:5432/learningyogi_dev
+      REDIS_URL: redis://redis:6379
+      S3_BUCKET: learningyogi-dev-documents
+      AWS_REGION: us-east-1
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      JWT_EXPIRY: 900
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend/nodejs:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev
+
+  # Python Classification Worker
+  classifier-worker:
+    build:
+      context: ./backend/python
+      dockerfile: Dockerfile
+    container_name: learningyogi-classifier
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://learningyogi:devpassword@postgres:5432/learningyogi_dev
+      S3_BUCKET: learningyogi-dev-documents
+      AWS_REGION: us-east-1
+    volumes:
+      - ./backend/python:/app
+    depends_on:
+      - redis
+      - postgres
+    command: python -m src.workers.classifier
+
+  # Python OCR Worker
+  ocr-worker:
+    build:
+      context: ./backend/python
+      dockerfile: Dockerfile
+    container_name: learningyogi-ocr
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://learningyogi:devpassword@postgres:5432/learningyogi_dev
+      S3_BUCKET: learningyogi-dev-documents
+      AWS_REGION: us-east-1
+      GOOGLE_APPLICATION_CREDENTIALS: /app/credentials/google-vision-key.json
+    volumes:
+      - ./backend/python:/app
+      - ./credentials:/app/credentials:ro
+    depends_on:
+      - redis
+      - postgres
+    command: python -m src.workers.ocr
+
+  # Python LLM Worker
+  llm-worker:
+    build:
+      context: ./backend/python
+      dockerfile: Dockerfile
+    container_name: learningyogi-llm
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://learningyogi:devpassword@postgres:5432/learningyogi_dev
+      S3_BUCKET: learningyogi-dev-documents
+      AWS_REGION: us-east-1
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      - ./backend/python:/app
+    depends_on:
+      - redis
+      - postgres
+    command: python -m src.workers.llm
+
+  # React Frontend (Development)
+  frontend:
+    build:
+      context: ./frontend/react
+      dockerfile: Dockerfile.dev
+    container_name: learningyogi-frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:4000/api/v1
+      REACT_APP_WS_URL: ws://localhost:4000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/react:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    command: npm start
+
+  # MinIO (S3-compatible storage for local dev)
+  minio:
+    image: minio/minio:latest
+    container_name: learningyogi-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Prometheus (Monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: learningyogi-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # Grafana (Visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: learningyogi-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: learningyogi-network

@@ -6,6 +6,7 @@
 import React, { useState, useCallback } from 'react';
 import { Bot, User, Send, Loader2 } from 'lucide-react';
 import { sendChatMessage } from '@/services/chatbot';
+import { useLLM } from '@/context/LLMContext';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -19,6 +20,7 @@ interface ChatbotProps {
 }
 
 export const Chatbot: React.FC<ChatbotProps> = ({ documentId, className }) => {
+  const { sessionId: llmSessionId } = useLLM(); // Get LLM session ID from context
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +40,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ documentId, className }) => {
     setIsLoading(true);
 
     try {
-      const response = await sendChatMessage(message, sessionId, documentId);
+      const response = await sendChatMessage(message, sessionId, documentId, llmSessionId);
       
       if (response.session_id) {
         setSessionId(response.session_id);
@@ -51,18 +53,36 @@ export const Chatbot: React.FC<ChatbotProps> = ({ documentId, className }) => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat error:', error);
+      let errorMsg = 'Unknown error occurred. Please try again.';
+      
+      if (error?.response) {
+        // Axios error with response
+        const status = error.response.status;
+        const detail = error.response.data?.detail || error.response.data?.error || error.message;
+        
+        if (status === 503) {
+          errorMsg = `AI service is currently unavailable: ${detail}. Please check your API key configuration.`;
+        } else if (status === 500) {
+          errorMsg = `Server error: ${detail || 'An internal error occurred'}. Please try again later.`;
+        } else {
+          errorMsg = detail || error.message || 'An error occurred. Please try again.';
+        }
+      } else if (error instanceof Error) {
+        errorMsg = error.message || 'An error occurred. Please try again.';
+      }
+      
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        content: `Sorry, I encountered an error: ${errorMsg}`,
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
-  }, [sessionId, documentId, isLoading]);
+  }, [sessionId, documentId, llmSessionId, isLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

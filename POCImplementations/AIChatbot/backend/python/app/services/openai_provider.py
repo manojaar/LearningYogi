@@ -12,11 +12,25 @@ from app.services.ai_provider import AIProvider
 class OpenAIProvider(AIProvider):
     """OpenAI API provider"""
 
-    def __init__(self):
-        self.api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("CHATBOT_OPENAI_API_KEY")
-        self.model = os.environ.get("CHATBOT_OPENAI_MODEL", "gpt-3.5-turbo")
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+        # Use provided API key, or fall back to environment variables
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("CHATBOT_OPENAI_API_KEY")
+        self.model = model or os.environ.get("CHATBOT_OPENAI_MODEL", "gpt-3.5-turbo")
         self.client = None
         
+        if self.api_key:
+            try:
+                self.client = OpenAI(api_key=self.api_key)
+            except Exception:
+                self.client = None
+    
+    def set_model(self, model: str):
+        """Update model dynamically"""
+        self.model = model
+    
+    def set_api_key(self, api_key: str):
+        """Update API key dynamically"""
+        self.api_key = api_key
         if self.api_key:
             try:
                 self.client = OpenAI(api_key=self.api_key)

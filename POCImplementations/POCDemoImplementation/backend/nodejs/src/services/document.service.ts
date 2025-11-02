@@ -25,7 +25,8 @@ export class DocumentService {
   async uploadDocument(
     buffer: Buffer,
     filename: string,
-    mimetype: string
+    mimetype: string,
+    sessionId?: string
   ): Promise<{ documentId: string; status: string }> {
     const documentId = uuidv4();
     const uniqueFilename = this.storage.generateUniqueFilename(filename);
@@ -55,10 +56,11 @@ export class DocumentService {
       await this.documentQueue.add({
         documentId,
         filePath,
+        sessionId, // Pass session ID to queue
       });
     } else {
       // Fallback to synchronous processing if queue not available
-      this.processDocument(documentId).catch(err => {
+      this.processDocument(documentId, sessionId).catch(err => {
         console.error(`Processing failed for document ${documentId}:`, err);
       });
     }
@@ -101,7 +103,7 @@ export class DocumentService {
   /**
    * Process document through pipeline
    */
-  private async processDocument(documentId: string): Promise<void> {
+  private async processDocument(documentId: string, sessionId?: string): Promise<void> {
     const doc = this.documentModel.getById(documentId);
     
     if (!doc) {
@@ -140,6 +142,7 @@ export class DocumentService {
           class_name: timetableData.className ?? null,
           term: timetableData.term ?? null,
           year: timetableData.year ?? null,
+          saved_name: null,
           timeblocks: JSON.stringify(timetableData.timeblocks),
           confidence: ocrResult.confidence,
           validated: validation.valid,

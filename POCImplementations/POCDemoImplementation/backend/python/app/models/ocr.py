@@ -38,8 +38,8 @@ class TimeBlock(BaseModel):
     """Timetable time block"""
     day: str
     name: str
-    startTime: str = Field(pattern=r"^\d{1,2}:\d{2}$", description="24-hour format H:MM or HH:MM")
-    endTime: str = Field(pattern=r"^\d{1,2}:\d{2}$", description="24-hour format H:MM or HH:MM")
+    startTime: Optional[str] = Field(None, pattern=r"^\d{1,2}:\d{2}$", description="24-hour format H:MM or HH:MM")
+    endTime: Optional[str] = Field(None, pattern=r"^\d{1,2}:\d{2}$", description="24-hour format H:MM or HH:MM")
     notes: Optional[str] = None
 
 

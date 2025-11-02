@@ -25,6 +25,8 @@ services:
       - PORT=4000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_CACHE_TTL=${REDIS_CACHE_TTL:-120}
+      - SESSION_TTL=${SESSION_TTL:-420}
       - QUEUE_CONCURRENCY=2
       - MAX_IMAGE_DIMENSION=2048
       - IMAGE_QUALITY=85
@@ -70,8 +72,9 @@ services:
       - LOCAL_LLM_URL=${LOCAL_LLM_URL:-http://localhost:11434}
       - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-llama2}
       - CHATBOT_ENABLE_CONTEXT=${CHATBOT_ENABLE_CONTEXT:-true}
-      - POC_DB_URL=./data/database/app.db
+      - POC_DB_URL=/data/database/app.db
       - KNOWLEDGE_BASE_PATH=/config/knowledge_base
+      - NODEJS_API_URL=http://nodejs-api:4000
     volumes:
       - ../AIChatbot/config:/config:ro
       - ./data:/data:ro

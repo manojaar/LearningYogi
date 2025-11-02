@@ -9,6 +9,7 @@ from app.models.chat import ChatMessage, ChatHistory
 from app.services.ai_service import AIService
 from app.context.database_context import DatabaseContextService
 from app.context.knowledge_base import KnowledgeBaseService
+from app.services.session_client import SessionClient
 
 
 class ChatService:
@@ -18,6 +19,7 @@ class ChatService:
         self.ai_service = AIService()
         self.db_context = DatabaseContextService()
         self.kb_service = KnowledgeBaseService()
+        self.session_client = SessionClient()
         
         # In-memory session storage (can be replaced with Redis/DB)
         self.sessions: Dict[str, ChatHistory] = {}
@@ -77,10 +79,14 @@ class ChatService:
         session_id: Optional[str] = None,
         context: Optional[Dict] = None,
         provider: Optional[str] = None,
-        mode: str = "general"
+        mode: str = "general",
+        llm_session_id: Optional[str] = None
     ) -> tuple[str, str]:
         """
         Process chat message and generate response
+
+        Args:
+            llm_session_id: Main app's LLM session ID to fetch API key from
 
         Returns:
             Tuple of (response, session_id)
@@ -97,12 +103,38 @@ class ChatService:
         # Build system prompt with context
         system_prompt = self.build_system_prompt(context, mode)
         
-        # Generate response
-        response, provider_name = await self.ai_service.chat(
-            messages=history,
-            system_prompt=system_prompt,
-            provider=provider
-        )
+        # Fetch LLM settings from main app if llm_session_id is provided
+        api_key_override = None
+        provider_override = provider
+        model_override = None
+        
+        if llm_session_id:
+            llm_settings = await self.session_client.get_llm_settings(llm_session_id)
+            if llm_settings:
+                api_key_override = llm_settings.get("apiKey")
+                if not provider_override:
+                    provider_override = llm_settings.get("provider")
+                model_override = llm_settings.get("model")
+        
+        # Generate response with dynamic API key if available
+        try:
+            response, provider_name = await self.ai_service.chat(
+                messages=history,
+                system_prompt=system_prompt,
+                provider=provider_override,
+                api_key=api_key_override,
+                model=model_override
+            )
+        except ValueError as e:
+            # No providers available - return helpful error message
+            error_msg = str(e)
+            if "No AI providers available" in error_msg:
+                raise ValueError(
+                    "No AI providers are configured. Please configure an LLM provider in the main application "
+                    "or set at least one of the following environment variables: "
+                    "ANTHROPIC_API_KEY (for Claude), OPENAI_API_KEY (for OpenAI), or configure LOCAL_LLM_URL (for local LLM)."
+                )
+            raise
         
         # Add assistant response to history
         self.add_message_to_session(session_id, "assistant", response)

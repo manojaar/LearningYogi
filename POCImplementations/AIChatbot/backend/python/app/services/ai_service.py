@@ -47,15 +47,41 @@ class AIService:
         messages: List[ChatMessage],
         system_prompt: Optional[str] = None,
         provider: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
         **kwargs
     ) -> tuple[str, str]:
         """
         Generate chat response using best available provider
 
+        Args:
+            api_key: Dynamic API key to use (overrides environment variable)
+            model: Dynamic model to use (overrides default)
+
         Returns:
             Tuple of (response_text, provider_name)
         """
+        # If api_key is provided, create a temporary provider with that key
+        if api_key and provider:
+            from app.services.ai_provider import AIProvider
+            if provider.lower() == "claude":
+                from app.services.claude_provider import ClaudeProvider
+                temp_provider = ClaudeProvider(api_key=api_key, model=model)
+            elif provider.lower() == "openai":
+                from app.services.openai_provider import OpenAIProvider
+                temp_provider = OpenAIProvider(api_key=api_key, model=model)
+            else:
+                # Fall back to regular provider selection
+                temp_provider = self.get_provider(provider)
+            
+            if temp_provider and temp_provider.is_available():
+                response = await temp_provider.chat(messages, system_prompt, **kwargs)
+                return response, provider.lower()
+        
+        # Use regular provider selection (falls back to environment variables)
         ai_provider = self.get_provider(provider)
+        if model and hasattr(ai_provider, 'set_model'):
+            ai_provider.set_model(model)
         response = await ai_provider.chat(messages, system_prompt, **kwargs)
         provider_name = next(
             (name for name, p in self.providers.items() if p == ai_provider),
@@ -68,15 +94,41 @@ class AIService:
         messages: List[ChatMessage],
         system_prompt: Optional[str] = None,
         provider: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
         **kwargs
     ) -> AsyncGenerator[tuple[str, str], None]:
         """
         Generate streaming chat response
 
+        Args:
+            api_key: Dynamic API key to use (overrides environment variable)
+            model: Dynamic model to use (overrides default)
+
         Yields:
             Tuples of (text_chunk, provider_name)
         """
+        # If api_key is provided, create a temporary provider with that key
+        if api_key and provider:
+            if provider.lower() == "claude":
+                from app.services.claude_provider import ClaudeProvider
+                temp_provider = ClaudeProvider(api_key=api_key, model=model)
+            elif provider.lower() == "openai":
+                from app.services.openai_provider import OpenAIProvider
+                temp_provider = OpenAIProvider(api_key=api_key, model=model)
+            else:
+                # Fall back to regular provider selection
+                temp_provider = self.get_provider(provider)
+            
+            if temp_provider and temp_provider.is_available():
+                async for chunk in temp_provider.chat_stream(messages, system_prompt, **kwargs):
+                    yield chunk, provider.lower()
+                return
+        
+        # Use regular provider selection (falls back to environment variables)
         ai_provider = self.get_provider(provider)
+        if model and hasattr(ai_provider, 'set_model'):
+            ai_provider.set_model(model)
         provider_name = next(
             (name for name, p in self.providers.items() if p == ai_provider),
             "unknown"

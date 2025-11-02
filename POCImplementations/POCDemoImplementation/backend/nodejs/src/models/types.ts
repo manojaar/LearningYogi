@@ -5,8 +5,8 @@
 export interface TimeBlock {
   day: string;
   name: string;
-  startTime: string;  // HH:MM format
-  endTime: string;    // HH:MM format
+  startTime?: string | null;  // HH:MM format (optional - AI may not extract)
+  endTime?: string | null;    // HH:MM format (optional - AI may not extract)
   notes?: string | null;
 }
 

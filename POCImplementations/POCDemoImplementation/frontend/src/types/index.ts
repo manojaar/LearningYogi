@@ -5,8 +5,8 @@
 export interface TimeBlock {
   day: string;
   name: string;
-  startTime: string;  // HH:MM format
-  endTime: string;    // HH:MM format
+  startTime?: string | null;  // HH:MM format (optional - AI may not extract)
+  endTime?: string | null;    // HH:MM format (optional - AI may not extract)
   notes?: string | null;
 }
 
@@ -15,6 +15,7 @@ export interface TimetableData {
   className?: string | null;
   term?: string | null;
   year?: number | null;
+  savedName?: string | null;  // User-defined name for saving timetable
   timeblocks: TimeBlock[];
 }
 
@@ -51,7 +52,8 @@ export interface TimetableRow {
   class_name: string | null;
   term: string | null;
   year: number | null;
-  timeblocks: string;  // JSON string
+  saved_name: string | null;  // User-defined name for saving timetable
+  timeblocks: string | any[];  // JSON string or parsed array
   confidence: number;
   validated: boolean;
   created_at: string;

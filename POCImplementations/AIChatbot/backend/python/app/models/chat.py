@@ -22,6 +22,7 @@ class ChatRequest(BaseModel):
     context: Optional[ChatContext] = Field(None, description="Optional context information")
     provider: Optional[str] = Field(None, description="AI provider override (claude, openai, local)")
     stream: Optional[bool] = Field(False, description="Enable streaming response")
+    llm_session_id: Optional[str] = Field(None, description="Main app's LLM session ID for API key retrieval")
 
 
 class ChatMessage(BaseModel):

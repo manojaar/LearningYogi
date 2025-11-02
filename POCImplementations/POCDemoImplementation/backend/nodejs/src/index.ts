@@ -8,10 +8,13 @@ import { StorageService } from './services/storage.service';
 import { ProcessingService } from './services/processing.service';
 import { ValidationService } from './services/validation.service';
 import { DocumentService } from './services/document.service';
+import { CacheService } from './services/cache.service';
 import { createDocumentsRouter } from './routes/documents';
 import { createTimetablesRouter } from './routes/timetables';
 import { createEventsRouter } from './routes/events';
+import { createLLMSettingsRouter } from './routes/llmSettings';
 import { createDocumentQueue } from './queues/documentQueue';
+import { SessionManager } from './services/sessionManager';
 
 // Load environment variables
 dotenv.config();
@@ -37,11 +40,32 @@ const processing = new ProcessingService(
 );
 const validation = new ValidationService();
 
+// Initialize Redis cache service
+const redisHost = process.env.REDIS_HOST || 'localhost';
+const redisPort = parseInt(process.env.REDIS_PORT || '6379');
+const cacheTTL = parseInt(process.env.REDIS_CACHE_TTL || '120'); // Default 2 minutes
+let cacheService: CacheService | undefined;
+try {
+  cacheService = new CacheService(redisHost, redisPort, cacheTTL);
+  console.log(`Redis cache service initialized with TTL: ${cacheTTL}s`);
+} catch (error) {
+  console.warn('Redis cache initialization failed:', error);
+  cacheService = undefined;
+}
+
+// Initialize session manager for LLM settings
+let sessionManager: SessionManager | undefined;
+try {
+  sessionManager = new SessionManager(cacheService);
+  console.log('Session manager initialized');
+} catch (error) {
+  console.warn('Session manager initialization failed:', error);
+  sessionManager = undefined;
+}
+
 // Initialize document queue (if Redis is available)
 let documentQueue;
 try {
-  const redisHost = process.env.REDIS_HOST || 'localhost';
-  const redisPort = parseInt(process.env.REDIS_PORT || '6379');
   documentQueue = createDocumentQueue(
     {
       documentModel,
@@ -49,9 +73,12 @@ try {
       storage,
       processing,
       validation,
+      cacheService,
+      sessionManager,
     },
     redisHost,
-    redisPort
+    redisPort,
+    cacheService
   );
   console.log('Document processing queue initialized');
 } catch (error) {
@@ -78,9 +105,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.use('/api/v1/documents', createDocumentsRouter(documentService));
-app.use('/api/v1/timetables', createTimetablesRouter(documentService, timetableModel));
+app.use('/api/v1/documents', createDocumentsRouter(documentService, sessionManager));
+app.use('/api/v1/timetables', createTimetablesRouter(documentService, timetableModel, cacheService));
 app.use('/api/v1/events', createEventsRouter());
+app.use('/api/v1/llm', createLLMSettingsRouter(sessionManager!));
 
 // Start server
 app.listen(PORT, () => {

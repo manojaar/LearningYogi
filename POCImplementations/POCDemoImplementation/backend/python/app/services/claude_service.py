@@ -9,7 +9,7 @@ import os
 import json
 import base64
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 try:
     from anthropic import Anthropic, AsyncAnthropic
@@ -25,10 +25,10 @@ class ClaudeService:
     Claude Vision API integration for timetable extraction
     """
 
-    def __init__(self):
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """Initialize Claude service with API key"""
-        self.api_key = os.environ.get("ANTHROPIC_API_KEY")
-        self.model = "claude-3-opus-20240229"  # Claude 3 Opus - most capable vision model
+        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        self.model = model or "claude-3-opus-20240229"  # Claude 3 Opus - most capable vision model
         
         if self.api_key and Anthropic:
             self.client = Anthropic(api_key=self.api_key)
@@ -40,6 +40,18 @@ class ClaudeService:
             self.async_client = AsyncAnthropic(api_key=self.api_key)
         else:
             self.async_client = None
+    
+    def set_api_key(self, api_key: str):
+        """Update API key dynamically"""
+        self.api_key = api_key
+        if self.api_key and Anthropic:
+            self.client = Anthropic(api_key=self.api_key)
+        if self.api_key and AsyncAnthropic:
+            self.async_client = AsyncAnthropic(api_key=self.api_key)
+    
+    def set_model(self, model: str):
+        """Update model dynamically"""
+        self.model = model
 
     def extract_timetable(self, image_path: str) -> TimetableData:
         """

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, X, Loader2 } from 'lucide-react';
+import { CheckCircle2, X, Loader2 } from 'lucide-react';
 import { useSSE } from '@/hooks/useSSE';
 import { useNavigate } from 'react-router-dom';
 import { TimetableTableWidget } from './TimetableTableWidget';
@@ -25,7 +25,7 @@ export const ProcessingNotification: React.FC<ProcessingNotificationProps> = ({
   useEffect(() => {
     if (event?.type === 'complete') {
       setHasCompleted(true);
-      
+
       // Extract timetable data from SSE event
       if (event.timetableData) {
         const data: TimetableData = {
@@ -37,7 +37,7 @@ export const ProcessingNotification: React.FC<ProcessingNotificationProps> = ({
         };
         setTimetableData(data);
         setShowTable(true);
-        
+
         // Don't auto-dismiss when showing table - let user interact with it
       } else {
         // Auto-dismiss after 3 seconds if no timetable data
@@ -49,8 +49,52 @@ export const ProcessingNotification: React.FC<ProcessingNotificationProps> = ({
         }, 3000);
         return () => clearTimeout(timer);
       }
+    } else if (event?.type === 'error') {
+      // Log error details to console for debugging
+      console.error('Processing error received:', {
+        documentId,
+        error: event.error,
+        event: event,
+      });
+
+      // On error, close notification and redirect to results page
+      // Error details will be shown on ResultsPage only
+      setShow(false);
+      navigate(`/results/${documentId}`);
+      if (onClose) {
+        onClose();
+      }
+    } else if (event?.type === 'progress') {
+      // Processing is in progress
+      setHasCompleted(false);
     }
-  }, [event, onClose]);
+  }, [event, onClose, documentId, navigate]);
+
+  // Determine status text based on event state (no error states)
+  const getStatusText = () => {
+    if (hasCompleted && event?.type === 'complete') return 'Completed';
+    
+    // Show progress states
+    if (event?.type === 'progress') {
+      return event.percentage === 100 ? 'Finalizing...' : 'In Progress...';
+    }
+    
+    // Connection states
+    if (!isConnected && !event) {
+      return 'Connecting...';
+    }
+    if (!isConnected && event) {
+      return 'Reconnecting...';
+    }
+    
+    // Default: processing started but waiting for first progress event
+    if (isConnected && !event) {
+      return 'In Progress...';
+    }
+    
+    // Connected and waiting
+    return 'In Progress...';
+  };
 
   const handleViewResults = () => {
     navigate(`/results/${documentId}`);
@@ -89,11 +133,15 @@ export const ProcessingNotification: React.FC<ProcessingNotificationProps> = ({
           <div className="flex items-center gap-2">
             <div
               className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-green-500' : 'bg-red-500 animate-pulse'
+                hasCompleted 
+                  ? 'bg-green-500' 
+                  : isConnected 
+                  ? 'bg-green-500' 
+                  : 'bg-red-500 animate-pulse'
               }`}
             />
             <span className="text-sm font-medium text-gray-700">
-              {isConnected ? 'Processing...' : 'Reconnecting...'}
+              {getStatusText()}
             </span>
           </div>
           <button
@@ -105,10 +153,11 @@ export const ProcessingNotification: React.FC<ProcessingNotificationProps> = ({
           </button>
         </div>
 
-        {/* Connection Error */}
-        {connectionError && (
+        {/* Connection Warning - Only show when not completed */}
+        {connectionError && !hasCompleted && (
           <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
             {connectionError}
+            <span className="ml-2 text-xs text-yellow-700">(Processing continues in background)</span>
           </div>
         )}
 
@@ -185,35 +234,13 @@ export const ProcessingNotification: React.FC<ProcessingNotificationProps> = ({
           </div>
         )}
 
-        {/* Error State */}
-        {event?.type === 'error' && (
-          <div className="text-center">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring' }}
-              className="flex justify-center mb-3"
-            >
-              <XCircle className="w-12 h-12 text-red-500" />
-            </motion.div>
-            <p className="text-lg font-semibold text-gray-900 mb-2">
-              Processing Failed
-            </p>
-            <p className="text-sm text-gray-600 mb-4">{event.error}</p>
-            <button
-              onClick={handleClose}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
-            >
-              Close
-            </button>
-          </div>
-        )}
-
-        {/* Loading State (before first event) */}
-        {!event && (
+        {/* Loading/Initial State - Show when waiting for first event */}
+        {!event && !hasCompleted && (
           <div className="flex items-center gap-3">
             <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-            <p className="text-sm text-gray-600">Connecting to server...</p>
+            <p className="text-sm text-gray-600">
+              {isConnected ? 'Waiting for processing to start...' : 'Connecting to server...'}
+            </p>
           </div>
         )}
       </motion.div>

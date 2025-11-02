@@ -1,14 +1,22 @@
 import express from 'express';
 import multer from 'multer';
 import { DocumentService } from '../services/document.service';
+import { SessionManager } from '../services/sessionManager';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Session manager will be injected via factory function
+let sessionManager: SessionManager | undefined;
+
 /**
  * Create routes with service instance
  */
-export function createDocumentsRouter(documentService: DocumentService) {
+export function createDocumentsRouter(
+  documentService: DocumentService,
+  sessionMgr?: SessionManager
+) {
+  sessionManager = sessionMgr;
   /**
    * Upload document
    */
@@ -18,10 +26,24 @@ export function createDocumentsRouter(documentService: DocumentService) {
         return res.status(400).json({ error: 'No file provided' });
       }
 
+      // Get session ID from header or body
+      const sessionId = req.headers['x-session-id'] as string || req.body.sessionId;
+
+      // Extend session on document upload (user activity)
+      if (sessionId && sessionManager) {
+        try {
+          await sessionManager.extendSession(sessionId);
+        } catch (error) {
+          // Log but don't fail upload if session extension fails
+          console.warn('Failed to extend session on upload:', error);
+        }
+      }
+
       const result = await documentService.uploadDocument(
         req.file.buffer,
         req.file.originalname,
-        req.file.mimetype
+        req.file.mimetype,
+        sessionId
       );
 
       res.json(result);

@@ -39,7 +39,8 @@ async def chat(request: ChatRequest):
                     request.session_id,
                     context_dict,
                     request.provider,
-                    mode
+                    mode,
+                    request.llm_session_id  # Pass LLM session ID for API key
                 ),
                 media_type="text/event-stream"
             )
@@ -50,7 +51,8 @@ async def chat(request: ChatRequest):
                 session_id=request.session_id,
                 context=context_dict,
                 provider=request.provider,
-                mode=mode
+                mode=mode,
+                llm_session_id=request.llm_session_id  # Pass LLM session ID for API key
             )
             
             # Get provider info
@@ -69,14 +71,22 @@ async def chat(request: ChatRequest):
                         "timetable_available": db_context.get("timetable") is not None
                     }
             
+            from datetime import datetime
             return ChatResponse(
                 response=response,
                 session_id=session_id,
                 provider=provider_used,
-                context_used=context_used
+                context_used=context_used,
+                timestamp=datetime.now()
             )
+    except ValueError as e:
+        # Provider not available or configuration error
+        raise HTTPException(status_code=503, detail=f"AI service unavailable: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Chat API error: {error_details}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 async def chat_stream_generator(
@@ -84,7 +94,8 @@ async def chat_stream_generator(
     session_id: str = None,
     context: dict = None,
     provider: str = None,
-    mode: str = "general"
+    mode: str = "general",
+    llm_session_id: str = None
 ):
     """Generate streaming response"""
     try:
@@ -100,12 +111,27 @@ async def chat_stream_generator(
         # Build prompt
         system_prompt = chat_service.build_system_prompt(context, mode)
         
-        # Stream response
+        # Fetch LLM settings from main app if llm_session_id is provided
+        api_key_override = None
+        provider_override = provider
+        model_override = None
+        
+        if llm_session_id:
+            llm_settings = await chat_service.session_client.get_llm_settings(llm_session_id)
+            if llm_settings:
+                api_key_override = llm_settings.get("apiKey")
+                if not provider_override:
+                    provider_override = llm_settings.get("provider")
+                model_override = llm_settings.get("model")
+        
+        # Stream response with dynamic API key if available
         full_response = ""
         async for chunk, provider_name in chat_service.ai_service.chat_stream(
             messages=history,
             system_prompt=system_prompt,
-            provider=provider
+            provider=provider_override,
+            api_key=api_key_override,
+            model=model_override
         ):
             full_response += chunk
             yield f"data: {json.dumps({'chunk': chunk, 'provider': provider_name})}\n\n"

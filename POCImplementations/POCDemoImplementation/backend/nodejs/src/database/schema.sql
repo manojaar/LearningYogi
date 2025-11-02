@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS timetables (
     class_name TEXT,
     term TEXT,
     year INTEGER,
+    saved_name TEXT,  -- User-defined name for saving timetable
     timeblocks TEXT,  -- JSON array
     confidence REAL,
     validated BOOLEAN DEFAULT 0,

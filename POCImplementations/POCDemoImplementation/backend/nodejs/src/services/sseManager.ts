@@ -7,6 +7,12 @@ export interface ProcessingEvent {
   result?: any;
   timetableData?: any; // Full timetable data for complete events
   error?: string;
+  errorDetails?: {
+    provider?: string;
+    model?: string;
+    step?: string;
+    hint?: string;
+  };
   documentId?: string;
 }
 
@@ -54,7 +60,7 @@ export class SSEManager {
 
     // Send to all clients, remove dead connections
     const deadConnections: Response[] = [];
-    
+
     clients.forEach((client) => {
       try {
         client.write(message);
@@ -68,6 +74,38 @@ export class SSEManager {
     deadConnections.forEach((deadClient) => {
       this.removeClient(documentId, deadClient);
     });
+
+    // Close all connections after terminal events (complete or error)
+    if (event.type === 'complete' || event.type === 'error') {
+      // Schedule connection closure after a brief delay to ensure event delivery
+      setTimeout(() => {
+        this.closeAllConnections(documentId);
+      }, 1000); // 1 second delay
+    }
+  }
+
+  /**
+   * Close all connections for a document
+   */
+  closeAllConnections(documentId: string): void {
+    const clients = this.clients.get(documentId);
+    if (!clients || clients.size === 0) {
+      return;
+    }
+
+    console.log(`Closing ${clients.size} SSE connection(s) for document ${documentId}`);
+
+    // Close all client connections
+    clients.forEach((client) => {
+      try {
+        client.end();
+      } catch (error) {
+        console.warn(`Failed to close SSE connection for document ${documentId}:`, error);
+      }
+    });
+
+    // Clear the clients set
+    this.clients.delete(documentId);
   }
 
   /**

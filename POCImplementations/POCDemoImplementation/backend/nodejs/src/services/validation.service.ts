@@ -46,24 +46,19 @@ export class ValidationService {
       errors.push(`Timeblock ${index}: missing name`);
     }
 
-    if (!block.startTime) {
-      errors.push(`Timeblock ${index}: missing startTime`);
+    // Note: startTime and endTime are now optional (AI may not always extract them)
+    // We only warn, not error, if they're missing
+
+    // Validate time format if provided
+    if (block.startTime && !/^\d{1,2}:\d{2}$/.test(block.startTime)) {
+      errors.push(`Timeblock ${index}: invalid startTime format (expected H:MM or HH:MM)`);
     }
 
-    if (!block.endTime) {
-      errors.push(`Timeblock ${index}: missing endTime`);
+    if (block.endTime && !/^\d{1,2}:\d{2}$/.test(block.endTime)) {
+      errors.push(`Timeblock ${index}: invalid endTime format (expected H:MM or HH:MM)`);
     }
 
-    // Validate time format
-    if (block.startTime && !/^\d{2}:\d{2}$/.test(block.startTime)) {
-      errors.push(`Timeblock ${index}: invalid startTime format (expected HH:MM)`);
-    }
-
-    if (block.endTime && !/^\d{2}:\d{2}$/.test(block.endTime)) {
-      errors.push(`Timeblock ${index}: invalid endTime format (expected HH:MM)`);
-    }
-
-    // Validate time logic
+    // Validate time logic (only if both times are provided)
     if (block.startTime && block.endTime) {
       const start = this.parseTime(block.startTime);
       const end = this.parseTime(block.endTime);
@@ -111,6 +106,11 @@ export class ValidationService {
    * Check if two timeblocks overlap
    */
   private timesOverlap(block1: TimeBlock, block2: TimeBlock): boolean {
+    // Skip overlap check if either block is missing times
+    if (!block1.startTime || !block1.endTime || !block2.startTime || !block2.endTime) {
+      return false;
+    }
+
     const start1 = this.parseTime(block1.startTime);
     const end1 = this.parseTime(block1.endTime);
     const start2 = this.parseTime(block2.startTime);
@@ -122,7 +122,8 @@ export class ValidationService {
   /**
    * Parse time string to minutes since midnight
    */
-  private parseTime(timeStr: string): number {
+  private parseTime(timeStr: string | null | undefined): number {
+    if (!timeStr) return 0; // Return 0 for null/undefined times
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
   }

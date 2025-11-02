@@ -16,7 +16,8 @@ export const TimetableTableWidget: React.FC<TimetableTableWidgetProps> = ({
   confidence = 1.0,
   onViewDetails,
 }) => {
-  const formatTime = (time: string): string => {
+  const formatTime = (time: string | null | undefined): string => {
+    if (!time) return 'N/A';
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -35,7 +36,7 @@ export const TimetableTableWidget: React.FC<TimetableTableWidgetProps> = ({
 
   // Sort timeblocks by start time within each day
   Object.keys(groupedByDay).forEach(day => {
-    groupedByDay[day].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    groupedByDay[day].sort((a, b) => (a.startTime || '09:00').localeCompare(b.startTime || '09:00'));
   });
 
   const getConfidenceColor = () => {
@@ -124,6 +125,7 @@ export const TimetableTableWidget: React.FC<TimetableTableWidgetProps> = ({
               return dayBlocks.map((block, index) => {
                 const bgColor = getSubjectHexColor(block.name);
                 const duration = (() => {
+                  if (!block.startTime || !block.endTime) return 'Duration unknown';
                   const [sh, sm] = block.startTime.split(':').map(Number);
                   const [eh, em] = block.endTime.split(':').map(Number);
                   const start = sh * 60 + sm;
@@ -161,7 +163,11 @@ export const TimetableTableWidget: React.FC<TimetableTableWidgetProps> = ({
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 text-sm text-gray-700">
                         <Clock className="w-3.5 h-3.5 text-gray-400" />
-                        <span>{formatTime(block.startTime)} - {formatTime(block.endTime)}</span>
+                        <span>
+                          {block.startTime && block.endTime
+                            ? `${formatTime(block.startTime)} - ${formatTime(block.endTime)}`
+                            : 'Time not specified'}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">

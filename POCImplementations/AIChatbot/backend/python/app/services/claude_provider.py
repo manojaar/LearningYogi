@@ -12,11 +12,25 @@ from app.services.ai_provider import AIProvider
 class ClaudeProvider(AIProvider):
     """Claude API provider"""
 
-    def __init__(self):
-        self.api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CHATBOT_CLAUDE_API_KEY")
-        self.model = os.environ.get("CHATBOT_CLAUDE_MODEL", "claude-3-haiku-20240307")
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+        # Use provided API key, or fall back to environment variables
+        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CHATBOT_CLAUDE_API_KEY")
+        self.model = model or os.environ.get("CHATBOT_CLAUDE_MODEL", "claude-3-haiku-20240307")
         self.client = None
         
+        if self.api_key:
+            try:
+                self.client = Anthropic(api_key=self.api_key)
+            except Exception:
+                self.client = None
+    
+    def set_model(self, model: str):
+        """Update model dynamically"""
+        self.model = model
+    
+    def set_api_key(self, api_key: str):
+        """Update API key dynamically"""
+        self.api_key = api_key
         if self.api_key:
             try:
                 self.client = Anthropic(api_key=self.api_key)

@@ -18,6 +18,7 @@ interface ChatRequest {
   context?: ChatContext;
   provider?: 'claude' | 'openai' | 'local';
   stream?: boolean;
+  llm_session_id?: string; // Main app's LLM session ID for API key
 }
 
 interface ChatResponse {
@@ -43,12 +44,14 @@ const chatbotApi = axios.create({
 export async function sendChatMessage(
   message: string,
   sessionId?: string,
-  documentId?: string
+  documentId?: string,
+  llmSessionId?: string // Main app's LLM session ID for API key
 ): Promise<ChatResponse> {
   const request: ChatRequest = {
     message,
     session_id: sessionId,
     context: documentId ? { document_id: documentId } : undefined,
+    llm_session_id: llmSessionId, // Pass LLM session ID for API key retrieval
   };
 
   const response = await chatbotApi.post<ChatResponse>('/api/v1/chat', request);

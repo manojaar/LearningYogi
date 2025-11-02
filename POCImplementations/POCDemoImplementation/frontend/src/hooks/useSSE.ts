@@ -10,6 +10,7 @@ export interface ProcessingEvent {
     className?: string | null;
     term?: string | null;
     year?: number | null;
+    savedName?: string | null;
     timeblocks: Array<{
       day: string;
       name: string;
@@ -21,6 +22,12 @@ export interface ProcessingEvent {
     validated?: boolean;
   };
   error?: string;
+  errorDetails?: {
+    provider?: string;
+    model?: string;
+    step?: string;
+    hint?: string;
+  };
   documentId?: string;
 }
 
@@ -42,6 +49,14 @@ export function useSSE(documentId: string | null): UseSSEReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const eventRef = useRef<ProcessingEvent | null>(null);
+  const connectedRef = useRef<boolean>(false);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    eventRef.current = event;
+    connectedRef.current = isConnected;
+  }, [event, isConnected]);
 
   useEffect(() => {
     if (!documentId) {
@@ -58,31 +73,100 @@ export function useSSE(documentId: string | null): UseSSEReturn {
     eventSource.onopen = () => {
       setIsConnected(true);
       setError(null);
+      connectedRef.current = true;
     };
 
     // Handle incoming messages
     eventSource.onmessage = (e) => {
       try {
+        // Ignore heartbeat messages
+        if (e.data.trim() === ': heartbeat' || e.data.trim().startsWith(': ')) {
+          return;
+        }
+
         const data = JSON.parse(e.data) as ProcessingEvent;
         setEvent(data);
-        
+        eventRef.current = data;
+        setError(null); // Clear any connection errors when we receive an event
+
         // Update connection status based on event type
         if (data.type === 'connected') {
           setIsConnected(true);
+          connectedRef.current = true;
+        } else if (data.type === 'error') {
+          // This is an actual processing error from the server
+          setIsConnected(true); // Connection is fine, but processing failed
+          connectedRef.current = true;
+
+          // Close connection after receiving error (terminal state)
+          console.log('Processing error received, closing SSE connection');
+          setTimeout(() => {
+            if (eventSourceRef.current) {
+              eventSourceRef.current.close();
+              eventSourceRef.current = null;
+              setIsConnected(false);
+              connectedRef.current = false;
+            }
+          }, 500); // Small delay to ensure state updates
+        } else if (data.type === 'complete') {
+          setIsConnected(true);
+          connectedRef.current = true;
+
+          // Close connection after receiving completion (terminal state)
+          console.log('Processing complete, closing SSE connection');
+          setTimeout(() => {
+            if (eventSourceRef.current) {
+              eventSourceRef.current.close();
+              eventSourceRef.current = null;
+              setIsConnected(false);
+              connectedRef.current = false;
+            }
+          }, 500); // Small delay to ensure state updates
+        } else if (data.type === 'progress') {
+          setIsConnected(true);
+          connectedRef.current = true;
         }
       } catch (err) {
         console.error('Failed to parse SSE event:', err);
-        setError('Failed to parse event data');
+        // Only set error if we can't parse - but don't treat as fatal processing error
+        // This is a connection/parsing issue, not a processing failure
+        if (!eventRef.current) {
+          setError('Failed to parse event data');
+        }
       }
     };
 
     // Handle errors
-    eventSource.onerror = (err) => {
-      console.error('SSE connection error:', err);
-      setIsConnected(false);
-      setError('Connection error. Attempting to reconnect...');
+    eventSource.onerror = () => {
+      const currentEvent = eventRef.current;
+      const currentConnected = connectedRef.current;
       
-      // EventSource will automatically attempt to reconnect
+      // EventSource.onerror fires during various states - we need to be careful
+      // It's NOT a processing error - only server-sent 'error' events indicate that
+      
+      if (eventSource.readyState === EventSource.CLOSED) {
+        // Connection closed - might be temporary
+        setIsConnected(false);
+        connectedRef.current = false;
+        // Only show error if we had a connection and were receiving events
+        if (currentConnected && currentEvent && currentEvent.type !== 'error' && currentEvent.type !== 'complete') {
+          setError('Connection lost. Attempting to reconnect...');
+        }
+      } else if (eventSource.readyState === EventSource.CONNECTING) {
+        // Reconnecting - this is normal, don't set error
+        setIsConnected(false);
+        connectedRef.current = false;
+        // Only set error if this is initial connection attempt and we have no events
+        if (!currentConnected && !currentEvent) {
+          setError('Connection error. Attempting to reconnect...');
+        } else {
+          setError(null); // Clear any previous errors during reconnect
+        }
+      }
+      
+      // Note: We don't treat EventSource.onerror as a processing failure
+      // Only actual error events from the server (type: 'error') indicate processing failure
+      // Connection errors are temporary and EventSource will auto-reconnect
     };
 
     // Cleanup on unmount
@@ -93,6 +177,8 @@ export function useSSE(documentId: string | null): UseSSEReturn {
       }
       setIsConnected(false);
       setEvent(null);
+      connectedRef.current = false;
+      eventRef.current = null;
     };
   }, [documentId]);
 

@@ -20,12 +20,24 @@ class DatabaseContextService:
             base_paths = [
                 Path("../../POCDemoImplementation/data/database/app.db"),
                 Path("./data/database/app.db"),
+                Path("/data/database/app.db"),  # Docker volume mount path
             ]
             for base_path in base_paths:
-                full_path = Path(__file__).parent.parent.parent.parent / base_path
-                if full_path.exists():
-                    self.db_path = str(full_path)
+                if base_path.is_absolute() and base_path.exists():
+                    self.db_path = str(base_path)
                     break
+                else:
+                    full_path = Path(__file__).parent.parent.parent.parent / base_path
+                    if full_path.exists():
+                        self.db_path = str(full_path)
+                        break
+        
+        # If still relative, try absolute path resolution
+        if self.db_path and not Path(self.db_path).is_absolute():
+            # Try as absolute path from root
+            abs_path = Path(self.db_path)
+            if abs_path.exists():
+                self.db_path = str(abs_path.absolute())
 
     def is_available(self) -> bool:
         """Check if database context is available"""

@@ -8,6 +8,7 @@ export interface TimetableRow {
   class_name: string | null;
   term: string | null;
   year: number | null;
+  saved_name: string | null;  // User-defined name for saving timetable
   timeblocks: string;  // JSON string
   confidence: number;
   validated: boolean;
@@ -20,8 +21,8 @@ export class TimetableModel {
   async create(timetable: Omit<TimetableRow, 'created_at'>): Promise<TimetableRow> {
     const stmt = this.db.prepare(`
       INSERT INTO timetables 
-      (id, document_id, teacher_name, class_name, term, year, timeblocks, confidence, validated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, document_id, teacher_name, class_name, term, year, saved_name, timeblocks, confidence, validated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -31,6 +32,7 @@ export class TimetableModel {
       timetable.class_name,
       timetable.term,
       timetable.year,
+      timetable.saved_name ?? null,
       timetable.timeblocks,
       timetable.confidence,
       timetable.validated ? 1 : 0
@@ -58,6 +60,60 @@ export class TimetableModel {
   updateValidated(id: string, validated: boolean): void {
     const stmt = this.db.prepare('UPDATE timetables SET validated = ? WHERE id = ?');
     stmt.run(validated ? 1 : 0, id);
+  }
+
+  /**
+   * Update timetable data
+   */
+  update(documentId: string, updates: {
+    teacher_name?: string | null;
+    class_name?: string | null;
+    term?: string | null;
+    year?: number | null;
+    saved_name?: string | null;
+    timeblocks?: string;
+  }): TimetableRow | null {
+    const timetable = this.getByDocumentId(documentId);
+    if (!timetable) return null;
+
+    const updatesList: string[] = [];
+    const values: any[] = [];
+
+    if (updates.teacher_name !== undefined) {
+      updatesList.push('teacher_name = ?');
+      values.push(updates.teacher_name);
+    }
+    if (updates.class_name !== undefined) {
+      updatesList.push('class_name = ?');
+      values.push(updates.class_name);
+    }
+    if (updates.term !== undefined) {
+      updatesList.push('term = ?');
+      values.push(updates.term);
+    }
+    if (updates.year !== undefined) {
+      updatesList.push('year = ?');
+      values.push(updates.year);
+    }
+    if (updates.saved_name !== undefined) {
+      updatesList.push('saved_name = ?');
+      values.push(updates.saved_name);
+    }
+    if (updates.timeblocks !== undefined) {
+      updatesList.push('timeblocks = ?');
+      values.push(updates.timeblocks);
+    }
+
+    if (updatesList.length === 0) {
+      return timetable;
+    }
+
+    values.push(documentId);
+    const sql = `UPDATE timetables SET ${updatesList.join(', ')} WHERE document_id = ?`;
+    const stmt = this.db.prepare(sql);
+    stmt.run(...values);
+
+    return this.getByDocumentId(documentId);
   }
 }
 

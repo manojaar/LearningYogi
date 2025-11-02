@@ -3,9 +3,12 @@ import { Upload, Sparkles, CheckCircle2, MessageCircle, X } from 'lucide-react';
 import { UploadZone } from '@/components/UploadZone';
 import { Chatbot } from '@/components/Chatbot';
 import { ProcessingNotification } from '@/components/ProcessingNotification';
+import { LLMSelector } from '@/components/LLMSelector';
 import { uploadDocument } from '@/services/api';
+import { useLLM } from '@/context/LLMContext';
 
 export const HomePage: React.FC = () => {
+  const { sessionId, showSelector, setShowSelector } = useLLM();
   const [isUploading, setIsUploading] = useState(false);
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [showChatbot, setShowChatbot] = useState(false);
@@ -15,7 +18,7 @@ export const HomePage: React.FC = () => {
     setIsUploading(true);
 
     try {
-      const result = await uploadDocument(file);
+      const result = await uploadDocument(file, sessionId);
       setDocumentId(result.documentId);
       setShowNotification(true);
       setIsUploading(false);
@@ -122,6 +125,11 @@ export const HomePage: React.FC = () => {
             documentId={documentId}
             onClose={handleNotificationClose}
           />
+        )}
+
+        {/* LLM Selector Modal */}
+        {showSelector && (
+          <LLMSelector onClose={() => setShowSelector(false)} />
         )}
       </div>
     </div>

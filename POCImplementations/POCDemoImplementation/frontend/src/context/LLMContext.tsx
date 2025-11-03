@@ -117,19 +117,33 @@ export function LLMProvider({ children }: { children: ReactNode }) {
         clearTimeout(extendSessionTimeoutRef.current);
       }
       
-      extendSessionTimeoutRef.current = setTimeout(async () => {
+      extendSessionTimeoutRef.current = setTimeout(() => {
         if (!showSelector && sessionId) {
-          try {
-            await extendSession(sessionId);
-          } catch (error) {
-            // If session expired, show selector
-            if (error && typeof error === 'object' && 'response' in error) {
-              const axiosError = error as any;
-              if (axiosError.response?.status === 404) {
-                setShowSelector(true);
+          // Wrap async operation to prevent unhandled rejections
+          Promise.resolve().then(async () => {
+            try {
+              await extendSession(sessionId);
+            } catch (error) {
+              // If session expired, show selector
+              if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as any;
+                if (axiosError.response?.status === 404) {
+                  setShowSelector(true);
+                }
+              }
+              // Silently handle other errors to prevent console noise
+              // Only log unexpected errors that aren't network/404 related
+              if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as any;
+                if (axiosError.response?.status !== 404 && axiosError.response?.status !== 0) {
+                  console.debug('Session extension error:', error);
+                }
               }
             }
-          }
+          }).catch(() => {
+            // Catch any errors from the promise chain itself
+            // This should rarely happen, but prevents unhandled rejections
+          });
         }
       }, 30000); // 30 second debounce
     };
@@ -158,24 +172,37 @@ export function LLMProvider({ children }: { children: ReactNode }) {
     }
 
     // Check session status every 30 seconds
-    activityCheckIntervalRef.current = setInterval(async () => {
+    activityCheckIntervalRef.current = setInterval(() => {
       if (!sessionId || showSelector) {
         return;
       }
 
-      try {
-        const status = await checkSessionStatus(sessionId);
-        if (!status.exists) {
-          // Session expired - show LLM selector
+      // Wrap async operation to prevent unhandled rejections
+      Promise.resolve().then(async () => {
+        try {
+          const status = await checkSessionStatus(sessionId);
+          if (!status.exists) {
+            // Session expired - show LLM selector
+            setShowSelector(true);
+            // Clear local preference
+            sessionStorage.removeItem('ly_llm_preference');
+          }
+        } catch (error) {
+          // On error, assume session expired
           setShowSelector(true);
-          // Clear local preference
           sessionStorage.removeItem('ly_llm_preference');
+          // Only log unexpected errors (not network issues)
+          if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as any;
+            if (axiosError.response?.status !== 404 && axiosError.response?.status !== 0) {
+              console.debug('Session status check error:', error);
+            }
+          }
         }
-      } catch (error) {
-        // On error, assume session expired
-        setShowSelector(true);
-        sessionStorage.removeItem('ly_llm_preference');
-      }
+      }).catch(() => {
+        // Catch any errors from the promise chain itself
+        // This should rarely happen, but prevents unhandled rejections
+      });
     }, 30000); // Check every 30 seconds
   }, [sessionId, showSelector]);
 
